@@ -1,0 +1,6 @@
+@import "../theme/colors.css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+*{box-sizing:border-box}body{margin:0;background:var(--color-background);color:var(--color-text);font-family:Arial,Helvetica,sans-serif}.scrollbar-none::-webkit-scrollbar{display:none}
+button,a{transition:all .18s ease}button:focus-visible,a:focus-visible{outline:3px solid rgb(var(--color-focus));outline-offset:2px}

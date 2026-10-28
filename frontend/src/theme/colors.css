@@ -1,0 +1,72 @@
+:root {
+  color-scheme: light;
+
+  /* Brand and primary actions */
+  --theme-brand-50: 238 251 244;
+  --theme-brand-100: 216 245 229;
+  --theme-brand-200: 183 235 208;
+  --theme-brand-500: 38 162 105;
+  --theme-brand-600: 24 132 84;
+  --theme-brand-700: 18 106 69;
+  --color-primary: rgb(var(--theme-brand-600));
+  --color-primary-hover: rgb(var(--theme-brand-700));
+  --color-secondary: rgb(var(--theme-brand-100));
+
+  /* Application surfaces */
+  --theme-white: 255 255 255;
+  --theme-black: 0 0 0;
+  --theme-ink: 24 34 29;
+  --theme-canvas: 245 247 244;
+  --color-sidebar: rgb(var(--theme-white));
+  --color-background: rgb(var(--theme-canvas));
+  --color-card: rgb(var(--theme-white));
+
+  /* Text, borders, forms, and tables */
+  --theme-slate-50: 248 250 252;
+  --theme-slate-100: 241 245 249;
+  --theme-slate-200: 226 232 240;
+  --theme-slate-300: 203 213 225;
+  --theme-slate-400: 148 163 184;
+  --theme-slate-500: 100 116 139;
+  --theme-slate-600: 71 85 105;
+  --theme-slate-900: 15 23 42;
+  --theme-slate-950: 2 6 23;
+  --color-text: rgb(var(--theme-ink));
+  --color-text-muted: rgb(var(--theme-slate-500));
+  --color-border: rgb(var(--theme-slate-200));
+  --color-button: rgb(var(--theme-brand-600));
+  --color-form-background: rgb(var(--theme-white));
+  --color-table-header: rgb(var(--theme-slate-50));
+  --color-focus: 134 219 174;
+  --color-shadow: 22 34 27;
+
+  /* Status colours */
+  --theme-emerald-50: 236 253 245;
+  --theme-emerald-200: 167 243 208;
+  --theme-emerald-300: 110 231 183;
+  --theme-emerald-600: 5 150 105;
+  --theme-emerald-700: 4 120 87;
+  --theme-emerald-800: 6 95 70;
+  --theme-rose-50: 255 241 242;
+  --theme-rose-100: 255 228 230;
+  --theme-rose-500: 244 63 94;
+  --theme-rose-600: 225 29 72;
+  --theme-rose-700: 190 18 60;
+  --theme-amber-100: 254 243 199;
+  --theme-amber-700: 180 83 9;
+  --theme-blue-50: 239 246 255;
+  --theme-blue-100: 219 234 254;
+  --theme-blue-700: 29 78 216;
+  --theme-violet-50: 245 243 255;
+  --theme-violet-100: 237 233 254;
+  --theme-violet-700: 109 40 217;
+  --color-status-success: rgb(var(--theme-emerald-600));
+  --color-status-warning: rgb(var(--theme-amber-700));
+  --color-status-error: rgb(var(--theme-rose-600));
+  --color-status-info: rgb(var(--theme-blue-700));
+
+  /* Charts */
+  --color-chart-primary: rgb(var(--theme-brand-500));
+  --color-chart-secondary: rgb(var(--theme-brand-600));
+  --color-chart-grid: 238 241 239;
+}
