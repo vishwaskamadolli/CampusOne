@@ -240,7 +240,14 @@ attendanceRouter.get("/reports", allowRoles("admin"), async (req, res, next) => 
 attendanceRouter.get("/audits", allowRoles("admin"), async (req, res, next) => {
   try {
     const filter = { tenantId: req.tenantId, ...(req.query.sessionId ? { sessionId: req.query.sessionId } : {}), ...(req.query.studentId ? { studentId: req.query.studentId } : {}) };
-    return res.json(await AttendanceAudit.find(filter).populate("studentId", "name rollNumber").populate("actorId", "name").sort({ createdAt: -1 }).lean());
+    return res.json(
+      await AttendanceAudit.find(filter)
+        .populate("studentId", "name rollNumber courseId departmentId sectionId")
+        .populate("sessionId", "date period courseId departmentId sectionId")
+        .populate("actorId", "name")
+        .sort({ createdAt: -1 })
+        .lean(),
+    );
   } catch (error) { return next(error); }
 });
 

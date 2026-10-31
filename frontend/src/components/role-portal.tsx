@@ -881,42 +881,44 @@ function ParentWorkspace({ user }: { user: SessionUser }) {
                 <h3 className="font-bold text-slate-900">College Announcements</h3>
                 <p className="text-xs text-slate-500">Official circulars, holidays, and events</p>
               </div>
-              <CalendarDays className="text-brand-600" size={20} />
-            </div>
-
-            {/* Calendar Filter Only */}
-            <div className="mt-4 flex items-center gap-2">
-              <div className="relative w-48 sm:w-52">
-                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">
-                  <CalendarDays size={14} />
-                </span>
-                <input
-                  type="month"
-                  value={eventMonth}
-                  onChange={(e) => setEventMonth(e.target.value)}
-                  aria-label="Filter announcements by calendar month"
-                  className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-7 text-xs font-semibold text-slate-800 shadow-2xs focus:border-brand-500 focus:outline-hidden"
-                />
+              <div className="flex items-center gap-2">
                 {eventMonth && (
-                  <button
-                    type="button"
-                    onClick={() => setEventMonth("")}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                    title="Clear calendar month"
-                  >
-                    <X size={13} />
-                  </button>
+                  <span className="flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-2.5 py-1 text-xs font-semibold text-brand-700">
+                    <span>
+                      {new Date(`${eventMonth}-01`).toLocaleDateString("en-IN", {
+                        month: "short",
+                        year: "numeric",
+                      })}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setEventMonth("")}
+                      className="rounded-full p-0.5 text-brand-600 hover:bg-brand-100 hover:text-brand-800"
+                      title="Clear calendar filter"
+                      aria-label="Clear calendar filter"
+                    >
+                      <X size={12} />
+                    </button>
+                  </span>
                 )}
-              </div>
-              {eventMonth && (
-                <button
-                  type="button"
-                  onClick={() => setEventMonth("")}
-                  className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                <label
+                  className={`relative grid h-9 w-9 cursor-pointer place-items-center rounded-xl border transition shadow-2xs ${
+                    eventMonth
+                      ? "border-brand-500 bg-brand-50 text-brand-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50"
+                  }`}
+                  title="Filter announcements by month"
                 >
-                  Clear
-                </button>
-              )}
+                  <CalendarDays size={18} />
+                  <input
+                    type="month"
+                    value={eventMonth}
+                    onChange={(e) => setEventMonth(e.target.value)}
+                    aria-label="Filter announcements by calendar month"
+                    className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+                  />
+                </label>
+              </div>
             </div>
 
             {/* Scroll-contained announcements list */}

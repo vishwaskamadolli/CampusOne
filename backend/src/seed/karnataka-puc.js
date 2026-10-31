@@ -129,31 +129,88 @@ async function seed() {
     teachers.push(teacher);
   }
 
-  const studentData = [
-    ["Aarav Prakash", "father", "Prakash Rao"], ["Ananya Ramesh", "mother", "Deepa Ramesh"],
-    ["Mohammed Zayan", "father", "Abdul Rahman"], ["Sanjana Murthy", "mother", "Roopa Murthy"],
-    ["Karthik Shetty", "father", "Naveen Shetty"], ["Niharika Patil", "mother", "Sunita Patil"],
-    ["Darshan Kumar", "guardian", "Meera Kumar"], ["Farheen Banu", "mother", "Shabana Banu"],
-    ["Chinmay Joshi", "father", "Madhusudan Joshi"], ["Meghana Naik", "mother", "Kavitha Naik"],
+  const firstNames = [
+    "Aarav", "Ananya", "Mohammed", "Sanjana", "Karthik", "Niharika", "Darshan", "Farheen", "Chinmay", "Meghana",
+    "Rohan", "Pooja", "Aditya", "Sneha", "Varun", "Kavya", "Rahul", "Priyanka", "Tejas", "Bhavana",
+    "Abhishek", "Divya", "Ganesh", "Anusha", "Chetan", "Spandana", "Manoj", "Aishwarya", "Pavan", "Keerthi",
+    "Harish", "Deepika", "Kiran", "Shreya", "Suraj", "Sahana", "Naveen", "Tanvi", "Sagar", "Vidya",
+    "Pradeep", "Rashmi", "Vishal", "Bindu", "Siddharth", "Neha", "Vikas", "Monika", "Yashwanth", "Preethi",
+    "Akash", "Swathi", "Rakesh", "Sowmya", "Vinay", "Megha", "Shashank", "Pallavi", "Gautam", "Lavanya",
+    "Mahesh", "Archana", "Bharat", "Roopa", "Vijay", "Chaithra", "Santosh", "Ashwini", "Deepak", "Sandhya",
+    "Sanjay", "Kusuma", "Ajay", "Shweta", "Anand", "Pavithra", "Sunil", "Shruthi", "Dhanush", "Amrutha",
+    "Guru", "Harshitha", "Raghu", "Sushma", "Sharath", "Rakshitha", "Chirag", "Namratha", "Prashanth", "Geetha",
+    "Lokesh", "Kavitha", "Shiva", "Mamatha", "Prajwal", "Bhoomika", "Puneeth", "Spoorthi", "Shashi", "Anjali",
   ];
+
+  const lastNames = [
+    "Prakash", "Ramesh", "Zayan", "Murthy", "Shetty", "Patil", "Kumar", "Banu", "Joshi", "Naik",
+    "Rao", "Gowda", "Kulkarni", "Bhat", "Hegde", "Deshmukh", "Nadar", "Reddy", "Kamath", "Acharya",
+  ];
+
+  const parentFirstNames = [
+    "Prakash", "Deepa", "Abdul", "Roopa", "Naveen", "Sunita", "Meera", "Shabana", "Madhusudan", "Kavitha",
+    "Suresh", "Lakshmi", "Ramesh", "Shailaja", "Manjunath", "Parvathi", "Anand", "Girija", "Venkatesh", "Radha",
+  ];
+
   const students = [];
   const parents = [];
-  for (let i = 0; i < studentData.length; i += 1) {
-    const [name, relationship, parentName] = studentData[i];
-    const [course, stream] = cohorts[i];
-    const student = await ensure(Student, "students", { tenantId, admissionNumber: `KPUC26${String(i + 1).padStart(3, "0")}` }, {
-      name, rollNumber: `26${stream.slice(0, 2).toUpperCase()}${String(i + 1).padStart(3, "0")}`,
-      courseId: classes[course]._id, departmentId: streams[stream]._id, sectionId: sections[i]._id,
-      email: `student${String(i + 1).padStart(2, "0")}@seed.example.invalid`, isActive: true,
-    });
-    students.push(student);
-    const email = `parent${String(i + 1).padStart(2, "0")}@seed.example.invalid`;
-    const parent = await ensure(User, "parents", { tenantId, email }, {
-      name: parentName, passwordHash, roles: ["parent"], isActive: true, mustChangePassword: false,
-      credentialDeliveryStatus: "failed",
-    });
-    parents.push(parent);
-    await ensure(ParentStudentLink, "parentStudentLinks", { tenantId, parentUserId: parent._id, studentId: student._id }, { relationship, verified: true });
+  let studentCounter = 0;
+
+  for (let cIdx = 0; cIdx < cohorts.length; cIdx += 1) {
+    const [course, stream, secName] = cohorts[cIdx];
+    const section = sections[cIdx];
+    const streamCode = stream.slice(0, 2).toUpperCase();
+    const courseCode = course.startsWith("1") ? "1" : "2";
+
+    for (let sIdx = 0; sIdx < 10; sIdx += 1) {
+      studentCounter += 1;
+      const numStr = String(studentCounter).padStart(3, "0");
+      const admissionNumber = `KPUC26${numStr}`;
+      const rollNumber = `26${courseCode}${streamCode}${secName}${String(sIdx + 1).padStart(2, "0")}`;
+
+      const fName = firstNames[(cIdx * 10 + sIdx) % firstNames.length];
+      const lName = lastNames[(cIdx * 7 + sIdx) % lastNames.length];
+      const studentName = `${fName} ${lName}`;
+
+      const rel = sIdx % 3 === 0 ? "father" : sIdx % 3 === 1 ? "mother" : "guardian";
+      const pFName = parentFirstNames[(cIdx * 5 + sIdx) % parentFirstNames.length];
+      const parentName = `${pFName} ${lName}`;
+
+      const student = await ensure(Student, "students", { tenantId, admissionNumber }, {
+        name: studentName,
+        rollNumber,
+        courseId: classes[course]._id,
+        departmentId: streams[stream]._id,
+        sectionId: section._id,
+        email: `student${numStr}@seed.example.invalid`,
+        phone: `+91 98${String(10000000 + studentCounter).slice(1)}`,
+        isActive: true,
+      });
+
+      student.courseId = classes[course]._id;
+      student.departmentId = streams[stream]._id;
+      student.sectionId = section._id;
+      await student.save();
+      students.push(student);
+
+      const parentEmail = `parent${numStr}@seed.example.invalid`;
+      const parent = await ensure(User, "parents", { tenantId, email: parentEmail }, {
+        name: parentName,
+        passwordHash,
+        roles: ["parent"],
+        isActive: true,
+        mustChangePassword: false,
+        credentialDeliveryStatus: "failed",
+      });
+      parents.push(parent);
+
+      await ensure(
+        ParentStudentLink,
+        "parentStudentLinks",
+        { tenantId, parentUserId: parent._id, studentId: student._id },
+        { relationship: rel, verified: true },
+      );
+    }
   }
 
   const settings = await getOrCreateTimetableSettings(tenantId);
@@ -230,37 +287,103 @@ async function seed() {
   }
 
   const attendanceDates = ["2026-08-03", "2026-08-10", "2026-08-17", "2026-08-24", "2026-08-31", "2026-09-07", "2026-09-14", "2026-09-21", "2026-09-28", "2026-10-05"];
-  for (let i = 0; i < students.length; i += 1) {
-    const entry = timetables[i].entries.find((item) => item.type === "period" && item.day === "Monday");
-    const assignment = await TeacherAssignment.findOne({ tenantId, courseId: students[i].courseId, departmentId: students[i].departmentId, sectionId: students[i].sectionId, subjectId: entry.subjectId });
-    const matchingSessions = await AttendanceSession.find({ tenantId, sectionId: students[i].sectionId, date: attendanceDates[i], period: 1 }).sort({ createdAt: 1 });
+  for (let cIdx = 0; cIdx < cohorts.length; cIdx += 1) {
+    const entry = timetables[cIdx].entries.find((item) => item.type === "period" && item.day === "Monday");
+    const sectionStudents = students.filter((s) => String(s.sectionId) === String(sections[cIdx]._id));
+    if (!sectionStudents.length) continue;
+
+    const assignment = await TeacherAssignment.findOne({
+      tenantId,
+      courseId: sectionStudents[0].courseId,
+      departmentId: sectionStudents[0].departmentId,
+      sectionId: sectionStudents[0].sectionId,
+      subjectId: entry.subjectId,
+    });
+
+    const matchingSessions = await AttendanceSession.find({
+      tenantId,
+      sectionId: sections[cIdx]._id,
+      date: attendanceDates[cIdx],
+      period: 1,
+    }).sort({ createdAt: 1 });
+
     let session = matchingSessions[0];
     if (session) remember("attendanceSessions", false);
-    else { session = new AttendanceSession({ tenantId }); remember("attendanceSessions", true); }
+    else {
+      session = new AttendanceSession({ tenantId });
+      remember("attendanceSessions", true);
+    }
+
     const duplicateSessions = matchingSessions.slice(1);
     if (duplicateSessions.length) {
       const duplicateIds = duplicateSessions.map((item) => item._id);
-      await AttendanceRecord.deleteMany({ tenantId, sessionId: { $in: duplicateIds }, studentId: students[i]._id });
+      await AttendanceRecord.deleteMany({ tenantId, sessionId: { $in: duplicateIds } });
       await AttendanceSession.deleteMany({ tenantId, _id: { $in: duplicateIds } });
     }
-    Object.assign(session, { courseId: students[i].courseId, departmentId: students[i].departmentId,
-      sectionId: students[i].sectionId, subjectId: entry.subjectId, date: attendanceDates[i], period: 1,
-      assignmentId: assignment?._id, teacherId: entry.teacherId, scheduledTeacherId: entry.teacherId,
-      timetableId: timetables[i]._id, timetableEntryId: entry._id, startTime: entry.startTime, endTime: entry.endTime, status: "submitted" });
-    await session.save();
-    await ensure(AttendanceRecord, "attendanceRecords", { tenantId, sessionId: session._id, studentId: students[i]._id }, {
-      status: ["present", "present", "late", "present", "absent", "present", "present", "excused", "present", "present"][i],
+
+    Object.assign(session, {
+      courseId: sectionStudents[0].courseId,
+      departmentId: sectionStudents[0].departmentId,
+      sectionId: sections[cIdx]._id,
+      subjectId: entry.subjectId,
+      date: attendanceDates[cIdx],
+      period: 1,
+      assignmentId: assignment?._id,
+      teacherId: entry.teacherId,
+      scheduledTeacherId: entry.teacherId,
+      timetableId: timetables[cIdx]._id,
+      timetableEntryId: entry._id,
+      startTime: entry.startTime,
+      endTime: entry.endTime,
+      status: "submitted",
     });
-    const mark = [86, 78, 91, 73, 82, 69, 88, 76, 84, 71][i];
-    const matchingResults = await Result.find({ tenantId, examinationId: exams[i]._id, studentId: students[i]._id }).sort({ createdAt: 1 });
-    let result = matchingResults[0];
-    if (result) remember("results", false);
-    else { result = new Result({ tenantId }); remember("results", true); }
-    if (matchingResults.length > 1)
-      await Result.deleteMany({ tenantId, _id: { $in: matchingResults.slice(1).map((item) => item._id) } });
-    Object.assign(result, { examinationId: exams[i]._id, studentId: students[i]._id, subjectId: entry.subjectId,
-      marks: mark, maxMarks: 100, grade: grade(mark), enteredBy: admin._id, approved: true });
-    await result.save();
+    await session.save();
+
+    const statusOptions = ["present", "present", "present", "late", "present", "present", "absent", "present", "present", "excused"];
+    for (let sIdx = 0; sIdx < sectionStudents.length; sIdx += 1) {
+      const st = sectionStudents[sIdx];
+      await ensure(
+        AttendanceRecord,
+        "attendanceRecords",
+        { tenantId, sessionId: session._id, studentId: st._id },
+        { status: statusOptions[(cIdx + sIdx) % statusOptions.length] },
+      );
+
+      const baseMarks = [86, 78, 91, 73, 82, 69, 88, 76, 84, 71];
+      const mark = Math.min(100, Math.max(40, baseMarks[sIdx % baseMarks.length] + ((cIdx * 3) % 11) - 4));
+
+      const matchingResults = await Result.find({
+        tenantId,
+        examinationId: exams[cIdx]._id,
+        studentId: st._id,
+      }).sort({ createdAt: 1 });
+
+      let result = matchingResults[0];
+      if (result) remember("results", false);
+      else {
+        result = new Result({ tenantId });
+        remember("results", true);
+      }
+
+      if (matchingResults.length > 1) {
+        await Result.deleteMany({
+          tenantId,
+          _id: { $in: matchingResults.slice(1).map((item) => item._id) },
+        });
+      }
+
+      Object.assign(result, {
+        examinationId: exams[cIdx]._id,
+        studentId: st._id,
+        subjectId: entry.subjectId,
+        marks: mark,
+        maxMarks: 100,
+        grade: grade(mark),
+        enteredBy: admin._id,
+        approved: true,
+      });
+      await result.save();
+    }
   }
 
   const eventData = [
@@ -280,8 +403,9 @@ async function seed() {
     events.push(await ensure(Event, "events", { tenantId, title }, { type, description, startsAt: new Date(startsAt), targetAllParents: true, status: "published", publishedAt: new Date("2026-10-27T00:00:00.000Z") }));
 
   for (let i = 0; i < parents.length; i += 1) {
-    await ensure(Notification, "notifications", { tenantId, userId: parents[i]._id, dedupeKey: `seed:puc:event:${events[i]._id}` }, {
-      type: "event", title: events[i].title, message: events[i].description, entityType: "Event", entityId: events[i]._id,
+    const event = events[i % events.length];
+    await ensure(Notification, "notifications", { tenantId, userId: parents[i]._id, dedupeKey: `seed:puc:event:${event._id}` }, {
+      type: "event", title: event.title, message: event.description, entityType: "Event", entityId: event._id,
       channels: { inApp: true, push: "disabled", email: "disabled" },
     });
   }

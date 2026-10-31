@@ -4,3 +4,13 @@
 @tailwind utilities;
 *{box-sizing:border-box}body{margin:0;background:var(--color-background);color:var(--color-text);font-family:Arial,Helvetica,sans-serif}.scrollbar-none::-webkit-scrollbar{display:none}
 button,a{transition:all .18s ease}button:focus-visible,a:focus-visible{outline:3px solid rgb(var(--color-focus));outline-offset:2px}
+@keyframes heartbeat {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  14% { transform: scale(1.35); opacity: 0.95; }
+  28% { transform: scale(1); opacity: 1; }
+  42% { transform: scale(1.25); opacity: 0.95; }
+  70% { transform: scale(1); opacity: 1; }
+}
+.animate-heartbeat {
+  animation: heartbeat 1.4s ease-in-out infinite;
+}

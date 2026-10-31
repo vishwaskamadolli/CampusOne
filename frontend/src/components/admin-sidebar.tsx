@@ -104,9 +104,6 @@ export function AdminSidebar({
                   className={`shrink-0 ${selected ? "text-brand-600" : "text-slate-400 group-hover:text-slate-600"}`}
                 />
                 <span className="flex-1">{label}</span>
-                {label === "Attendance" && (
-                  <span className="rounded-md bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-700">12</span>
-                )}
               </button>
             );
           })}

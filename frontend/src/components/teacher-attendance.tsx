@@ -355,35 +355,61 @@ export function TeacherAttendanceWorkspace() {
                 <p className="py-12 text-center text-sm text-rose-700">{studentsError}</p>
               ) : students.length ? (
                 <div className="mt-4 space-y-2">
-                  {students.map((student) => (
-                    <div
-                      key={student._id}
-                      className="flex flex-col gap-3 rounded-xl bg-slate-50 p-3 sm:flex-row sm:items-center sm:justify-between"
-                    >
-                      <span>
-                        <b className="text-sm">{student.name}</b>
-                        <small className="ml-2 text-slate-500">
-                          {student.rollNumber}
-                        </small>
-                      </span>
-                      <select
-                        value={values[student._id] || "present"}
-                        onChange={(event) =>
-                          setValues({
-                            ...values,
-                            [student._id]: event.target.value,
-                          })
-                        }
-                        className="w-full rounded-lg border border-slate-200 bg-white p-2 text-sm sm:w-auto"
+                  {students.map((student) => {
+                    const isPresent = (values[student._id] || "present") === "present";
+                    return (
+                      <div
+                        key={student._id}
+                        className="flex items-center justify-between gap-3 rounded-xl bg-slate-50 p-3 transition hover:bg-slate-100/60"
                       >
-                        {statuses.map((status) => (
-                          <option key={status} value={status}>
-                            {status[0].toUpperCase() + status.slice(1)}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  ))}
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-slate-800">
+                            {student.name}
+                          </p>
+                          <p className="text-xs text-slate-400">
+                            {student.rollNumber ? `Roll ${student.rollNumber}` : "No roll number"}
+                          </p>
+                        </div>
+                        <div className="flex shrink-0 items-center gap-2.5">
+                          <span
+                            className={`text-xs font-bold select-none ${
+                              isPresent ? "text-emerald-700" : "text-rose-700"
+                            }`}
+                          >
+                            {isPresent ? "Present" : "Absent"}
+                          </span>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={isPresent}
+                            aria-label={`Toggle attendance status for ${student.name || "student"}. Currently ${isPresent ? "Present" : "Absent"}`}
+                            onClick={() =>
+                              setValues((prev) => ({
+                                ...prev,
+                                [student._id]: isPresent ? "absent" : "present",
+                              }))
+                            }
+                            className={`relative inline-flex h-6 w-14 shrink-0 cursor-pointer items-center rounded-full p-0.5 transition-colors duration-200 ease-in-out focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-brand-500 ${
+                              isPresent ? "bg-emerald-600" : "bg-rose-600"
+                            }`}
+                          >
+                            <span
+                              className={`pointer-events-none absolute text-[9px] font-extrabold uppercase tracking-wider text-white select-none ${
+                                isPresent ? "left-1.5" : "right-1.5"
+                              }`}
+                            >
+                              {isPresent ? "P" : "A"}
+                            </span>
+                            <span
+                              className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-xs ring-0 transition duration-200 ease-in-out ${
+                                isPresent ? "translate-x-[32px]" : "translate-x-0"
+                              }`}
+                            />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                   {(selected?.submitted || selected?.substitution) && (
                     <textarea
                       value={reason}
