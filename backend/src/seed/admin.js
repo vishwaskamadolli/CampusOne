@@ -1,3 +1,4 @@
+import "dotenv/config";
 import bcrypt from "bcryptjs";
 import mongoose from "mongoose";
 import { pathToFileURL } from "node:url";

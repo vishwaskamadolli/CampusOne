@@ -1,27 +1,48 @@
 "use client";
-import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
+import { FormEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   AlertCircle,
+  CalendarDays,
+  CalendarPlus,
   CheckCircle2,
+  Clock3,
   LoaderCircle,
+  Megaphone,
   Pencil,
   Plus,
   RefreshCw,
   Search,
+  Send,
+  Sparkles,
   Trash2,
   Upload,
+  UsersRound,
   X,
   BookOpen,
   Check,
+  ContactRound,
+  GraduationCap,
+  Hash,
   LockKeyhole,
   Mail,
+  Phone,
   Settings,
   UserPlus,
 } from "lucide-react";
 import { ResultsImportWorkspace } from "@/components/results-import-workspace";
+import {
+  FormModal,
+  FormSectionHeading,
+} from "@/components/form-modal";
+import {
+  AcademicFormModal,
+  type FormField,
+} from "@/components/academic-form-modal";
 import { api } from "@/lib/api";
 import { toastAction, toastError } from "@/lib/toast";
 import { Pagination, usePagination } from "@/components/pagination";
+import { SearchableSelect, type SearchableSelectOption } from "@/components/searchable-select";
 
 type Item = Record<string, any> & {
   _id: string;
@@ -30,22 +51,6 @@ type Item = Record<string, any> & {
   code?: string;
   isActive?: boolean;
   status?: string;
-};
-type Field = {
-  key: string;
-  label: string;
-  type?:
-    | "text"
-    | "number"
-    | "date"
-    | "datetime-local"
-    | "select"
-    | "multiselect"
-    | "textarea"
-    | "checkbox";
-  required?: boolean;
-  options?: { label: string; value: string }[];
-  createOnly?: boolean;
 };
 const academicTabs = [
   "academic-years",
@@ -528,6 +533,35 @@ export function ModuleWorkspace({ module }: { module: string }) {
           submit={submit}
           close={() => { setOpen(false); setEditing(null); }}
         />
+      ) : module === "Students" ? (
+        <StudentModal
+          editing={editing}
+          refs={refs}
+          saving={saving}
+          error={error}
+          submit={submit}
+          close={() => { setOpen(false); setEditing(null); setError(""); }}
+        />
+      ) : module === "Events" ? (
+        <EventModal
+          editing={editing}
+          saving={saving}
+          error={error}
+          submit={submit}
+          close={() => { setOpen(false); setEditing(null); setError(""); }}
+        />
+      ) : module === "Academics" ? (
+        <AcademicFormModal
+          resource={resource}
+          editing={editing}
+          fields={fields}
+          saving={saving}
+          submit={submit}
+          close={() => { setOpen(false); setEditing(null); }}
+          onStructureChange={(key, value) =>
+            setStructure((current) => ({ ...current, [key]: value }))
+          }
+        />
       ) : (
         <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
           <form
@@ -648,24 +682,720 @@ export function ModuleWorkspace({ module }: { module: string }) {
     </section>
   );
 }
+
+function StudentModal({
+  editing,
+  refs,
+  saving,
+  error,
+  submit,
+  close,
+}: {
+  editing: Item | null;
+  refs: Record<string, Item[]>;
+  saving: boolean;
+  error: string;
+  submit: (event: FormEvent<HTMLFormElement>) => void;
+  close: () => void;
+}) {
+  const [courseId, setCourseId] = useState(fieldValue(editing, "courseId"));
+  const [departmentId, setDepartmentId] = useState(
+    fieldValue(editing, "departmentId"),
+  );
+  const [sectionId, setSectionId] = useState(fieldValue(editing, "sectionId"));
+  const [validationError, setValidationError] = useState("");
+  const sectionOptions: SearchableSelectOption[] = (refs.sections || [])
+    .filter(
+      (section) =>
+        fieldValue(section, "courseId") === courseId &&
+        fieldValue(section, "departmentId") === departmentId,
+    )
+    .map((section) => ({
+      value: section._id,
+      label: section.name || section.code || "Unnamed section",
+      description: [section.courseId?.name, section.departmentId?.name]
+        .filter(Boolean)
+        .join(" · ") || "Section",
+    }));
+  const classOptions: SearchableSelectOption[] = (refs.classes || []).map(
+    (item) => ({
+      value: item._id,
+      label: item.name || item.code || "Unnamed class",
+      description: item.code ? `Class · ${item.code}` : "Class",
+    }),
+  );
+  const streamOptions: SearchableSelectOption[] = (refs.streams || []).map(
+    (item) => ({
+      value: item._id,
+      label: item.name || item.code || "Unnamed stream",
+      description: item.code ? `Stream · ${item.code}` : "Stream",
+    }),
+  );
+  const inputClass =
+    "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-100";
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    if (!courseId || !departmentId || !sectionId) {
+      event.preventDefault();
+      setValidationError("Choose a class, stream, and section to continue.");
+      return;
+    }
+    setValidationError("");
+    submit(event);
+  }
+
+  return (
+    <FormModal
+      titleId="student-modal-title"
+      title={editing ? "Edit student profile" : "Add a student"}
+      description="Capture student details and place them in the right class, stream, and section."
+      icon={editing ? <ContactRound size={24} /> : <GraduationCap size={24} />}
+      onClose={close}
+      maxWidth="max-w-3xl"
+    >
+      <form
+        onSubmit={handleSubmit}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-slate-50/70 p-4 sm:p-6">
+          <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
+            <FormSectionHeading
+              icon={<ContactRound size={18} />}
+              title="Personal information"
+              description="Add the student's name and optional contact details."
+            />
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-xs font-semibold text-slate-600 sm:col-span-2">
+                Student full name <span className="text-rose-500">*</span>
+                <input
+                  name="name"
+                  required
+                  defaultValue={fieldValue(editing, "name")}
+                  placeholder="Enter the student's full name"
+                  className={`${inputClass} mt-2`}
+                />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">
+                Email address{" "}
+                <span className="font-normal text-slate-400">(optional)</span>
+                <span className="relative mt-2 block">
+                  <Mail
+                    aria-hidden="true"
+                    size={16}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    name="email"
+                    type="email"
+                    defaultValue={fieldValue(editing, "email")}
+                    placeholder="student@example.com"
+                    className={`${inputClass} pl-9`}
+                  />
+                </span>
+              </label>
+              <label className="text-xs font-semibold text-slate-600">
+                Phone number{" "}
+                <span className="font-normal text-slate-400">(optional)</span>
+                <span className="relative mt-2 block">
+                  <Phone
+                    aria-hidden="true"
+                    size={16}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    name="phone"
+                    type="tel"
+                    defaultValue={fieldValue(editing, "phone")}
+                    placeholder="Enter phone number"
+                    className={`${inputClass} pl-9`}
+                  />
+                </span>
+              </label>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
+            <FormSectionHeading
+              icon={<GraduationCap size={18} />}
+              title="Academic placement"
+              description="Student identifiers and current class assignment."
+            />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-xs font-semibold text-slate-600">
+                Roll number <span className="text-rose-500">*</span>
+                <span className="relative mt-2 block">
+                  <Hash
+                    aria-hidden="true"
+                    size={16}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    name="rollNumber"
+                    required
+                    defaultValue={fieldValue(editing, "rollNumber")}
+                    placeholder="e.g. 2PUC-014"
+                    className={`${inputClass} pl-9`}
+                  />
+                </span>
+              </label>
+              <label className="text-xs font-semibold text-slate-600">
+                Admission number <span className="text-rose-500">*</span>
+                <span className="relative mt-2 block">
+                  <Hash
+                    aria-hidden="true"
+                    size={16}
+                    className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  />
+                  <input
+                    name="admissionNumber"
+                    required
+                    defaultValue={fieldValue(editing, "admissionNumber")}
+                    placeholder="Enter admission number"
+                    className={`${inputClass} pl-9`}
+                  />
+                </span>
+              </label>
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-slate-600">
+                  Class <span className="text-rose-500">*</span>
+                </p>
+                <input type="hidden" name="courseId" value={courseId} />
+                <SearchableSelect
+                  label="Class"
+                  value={courseId}
+                  options={classOptions}
+                  onChange={(value) => {
+                    setCourseId(value);
+                    setSectionId("");
+                    setValidationError("");
+                  }}
+                  placeholder="Choose class"
+                  searchPlaceholder="Search classes..."
+                  icon={<GraduationCap size={16} />}
+                />
+              </div>
+              <div>
+                <p className="mb-1.5 text-xs font-semibold text-slate-600">
+                  Stream <span className="text-rose-500">*</span>
+                </p>
+                <input
+                  type="hidden"
+                  name="departmentId"
+                  value={departmentId}
+                />
+                <SearchableSelect
+                  label="Stream"
+                  value={departmentId}
+                  options={streamOptions}
+                  onChange={(value) => {
+                    setDepartmentId(value);
+                    setSectionId("");
+                    setValidationError("");
+                  }}
+                  placeholder="Choose stream"
+                  searchPlaceholder="Search streams..."
+                  icon={<BookOpen size={16} />}
+                />
+              </div>
+              <div className="sm:col-span-2">
+                <p className="mb-1.5 text-xs font-semibold text-slate-600">
+                  Section <span className="text-rose-500">*</span>
+                </p>
+                <input type="hidden" name="sectionId" value={sectionId} />
+                <SearchableSelect
+                  label="Section"
+                  value={sectionId}
+                  options={sectionOptions}
+                  onChange={(value) => {
+                    setSectionId(value);
+                    setValidationError("");
+                  }}
+                  placeholder={
+                    courseId && departmentId
+                      ? "Choose section"
+                      : "Choose class and stream first"
+                  }
+                  searchPlaceholder="Search sections..."
+                  icon={<UsersRound size={16} />}
+                />
+                {courseId && departmentId && (
+                  <p className="mt-2 text-[11px] text-slate-400">
+                    Available sections are matched to the selected class and
+                    stream.
+                  </p>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {(error || validationError) && (
+            <p
+              role="alert"
+              className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+            >
+              {error || validationError}
+            </p>
+          )}
+        </div>
+
+        <footer className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-white px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
+          <button
+            type="button"
+            onClick={close}
+            className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? (
+              <LoaderCircle size={16} className="animate-spin" />
+            ) : editing ? (
+              <CheckCircle2 size={16} />
+            ) : (
+              <GraduationCap size={17} />
+            )}
+            {saving ? "Saving..." : editing ? "Save changes" : "Add student"}
+          </button>
+        </footer>
+      </form>
+    </FormModal>
+  );
+}
+
+const eventTypeOptions: SearchableSelectOption[] = [
+  {
+    value: "event",
+    label: "Campus event",
+    description: "Celebrations, activities, and campus programs",
+  },
+  {
+    value: "holiday",
+    label: "Holiday",
+    description: "College closure and holiday announcements",
+  },
+  {
+    value: "exam",
+    label: "Examination",
+    description: "Exam schedules and assessment notices",
+  },
+  {
+    value: "meeting",
+    label: "Meeting",
+    description: "Parent, student, or college meetings",
+  },
+  {
+    value: "notice",
+    label: "General notice",
+    description: "Important updates for the college community",
+  },
+];
+
+function EventModal({
+  editing,
+  saving,
+  error,
+  submit,
+  close,
+}: {
+  editing: Item | null;
+  saving: boolean;
+  error: string;
+  submit: (event: FormEvent<HTMLFormElement>) => void;
+  close: () => void;
+}) {
+  const [eventType, setEventType] = useState(
+    fieldValue(editing, "type") || "event",
+  );
+  const [targetAllParents, setTargetAllParents] = useState(
+    Boolean(editing?.targetAllParents),
+  );
+  const inputClass =
+    "w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-300 focus:border-brand-500 focus:ring-4 focus:ring-brand-100";
+
+  return (
+    <FormModal
+      titleId="event-modal-title"
+      title={editing ? "Edit announcement" : "Create an event"}
+      description="Share the important details and choose who should be notified."
+      icon={editing ? <Megaphone size={24} /> : <CalendarPlus size={24} />}
+      onClose={close}
+      maxWidth="max-w-2xl"
+    >
+      <form
+        onSubmit={submit}
+        className="flex min-h-0 flex-1 flex-col overflow-hidden"
+      >
+        <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-slate-50/70 p-4 sm:p-6">
+          <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
+            <FormSectionHeading
+              icon={<CalendarDays size={18} />}
+              title="Event information"
+              description="Give your announcement a clear title and category."
+            />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-xs font-semibold text-slate-600 sm:col-span-2">
+                Event title <span className="text-rose-500">*</span>
+                <input
+                  name="title"
+                  required
+                  defaultValue={fieldValue(editing, "title")}
+                  placeholder="e.g. Annual Cultural Festival"
+                  className={`${inputClass} mt-2`}
+                />
+              </label>
+
+              <div className="text-xs font-semibold text-slate-600 sm:col-span-2">
+                Event type <span className="text-rose-500">*</span>
+                <input type="hidden" name="type" value={eventType} />
+                <SearchableSelect
+                  label="Event type"
+                  value={eventType}
+                  options={eventTypeOptions}
+                  onChange={setEventType}
+                  placeholder="Choose an event type"
+                  searchPlaceholder="Search event types..."
+                  icon={<CalendarDays size={16} />}
+                  className="mt-2"
+                />
+              </div>
+
+              <label className="text-xs font-semibold text-slate-600 sm:col-span-2">
+                Description <span className="text-rose-500">*</span>
+                <textarea
+                  name="description"
+                  required
+                  defaultValue={fieldValue(editing, "description")}
+                  placeholder="Add the details parents and students need to know..."
+                  rows={4}
+                  className={`${inputClass} mt-2 resize-y`}
+                />
+                <span className="mt-1.5 block text-[11px] font-normal text-slate-400">
+                  Keep it clear and include any useful instructions.
+                </span>
+              </label>
+            </div>
+          </section>
+
+          <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5">
+            <FormSectionHeading
+              icon={<Clock3 size={18} />}
+              title="Schedule and audience"
+              description="Set the event time and notification audience."
+            />
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="text-xs font-semibold text-slate-600">
+                Starts at <span className="text-rose-500">*</span>
+                <input
+                  name="startsAt"
+                  type="datetime-local"
+                  required
+                  defaultValue={fieldValue(editing, "startsAt")}
+                  className={`${inputClass} mt-2`}
+                />
+              </label>
+              <label className="text-xs font-semibold text-slate-600">
+                Ends at{" "}
+                <span className="font-normal text-slate-400">(optional)</span>
+                <input
+                  name="endsAt"
+                  type="datetime-local"
+                  defaultValue={fieldValue(editing, "endsAt")}
+                  className={`${inputClass} mt-2`}
+                />
+              </label>
+            </div>
+
+            <label className="mt-4 flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-slate-50/80 p-4 transition hover:border-brand-200 hover:bg-brand-50/40">
+              <input
+                name="targetAllParents"
+                type="checkbox"
+                checked={targetAllParents}
+                onChange={(event) => setTargetAllParents(event.target.checked)}
+                className="peer sr-only"
+              />
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+                  <Send size={14} className="text-brand-600" />
+                  Notify all parents
+                </span>
+                <span className="mt-1 block text-xs font-normal leading-relaxed text-slate-500">
+                  Add this announcement to every parent&apos;s in-app
+                  notifications.
+                </span>
+              </span>
+              <span
+                role="switch"
+                aria-checked={targetAllParents}
+                className={`relative mt-0.5 h-6 w-11 shrink-0 rounded-full transition peer-focus-visible:ring-4 peer-focus-visible:ring-brand-200 ${
+                  targetAllParents ? "bg-brand-600" : "bg-slate-300"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition ${
+                    targetAllParents ? "left-[22px]" : "left-0.5"
+                  }`}
+                />
+              </span>
+            </label>
+          </section>
+
+          {error && (
+            <p
+              role="alert"
+              className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700"
+            >
+              {error}
+            </p>
+          )}
+        </div>
+
+        <footer className="flex shrink-0 flex-col-reverse gap-2 border-t border-slate-100 bg-white px-4 py-4 sm:flex-row sm:justify-end sm:px-6">
+          <button
+            type="button"
+            onClick={close}
+            className="rounded-xl border border-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={saving}
+            className="flex items-center justify-center gap-2 rounded-xl bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {saving ? (
+              <LoaderCircle size={16} className="animate-spin" />
+            ) : editing ? (
+              <CheckCircle2 size={16} />
+            ) : (
+              <CalendarPlus size={16} />
+            )}
+            {saving ? "Saving..." : editing ? "Save changes" : "Create event"}
+          </button>
+        </footer>
+      </form>
+    </FormModal>
+  );
+}
+
 function TeacherModal({ editing, refs, saving, error, submit, close }: { editing: Item | null; refs: Record<string, Item[]>; saving: boolean; error: string; submit: (event: FormEvent<HTMLFormElement>) => void; close: () => void }) {
   const [departmentId, setDepartmentId] = useState(fieldValue(editing, "departmentId"));
   const [subjectSearch, setSubjectSearch] = useState("");
   const [subjectsOpen, setSubjectsOpen] = useState(false);
+  const [subjectMenuPosition, setSubjectMenuPosition] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
+  const subjectTriggerRef = useRef<HTMLButtonElement>(null);
+  const subjectMenuRef = useRef<HTMLDivElement>(null);
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>(fieldValues(editing, "teachingSubjectIds"));
   const mappedIds = new Set((refs["stream-subjects"] || []).filter((mapping) => fieldValue(mapping, "streamId") === departmentId).map((mapping) => fieldValue(mapping, "subjectId")));
   const availableSubjects = (refs.subjects || []).filter((subject) => mappedIds.has(subject._id));
   const filteredSubjects = availableSubjects.filter((subject) => `${subject.name} ${subject.code || ""}`.toLowerCase().includes(subjectSearch.toLowerCase()));
   const selectedDetails = (refs.subjects || []).filter((subject) => selectedSubjects.includes(subject._id));
+  const streamOptions: SearchableSelectOption[] = (refs.streams || []).map((stream) => ({
+    value: stream._id,
+    label: stream.name || stream.code || "Unnamed stream",
+    description: stream.code || "Academic stream",
+  }));
+  const [streamError, setStreamError] = useState("");
   const fieldClass = "mt-2 w-full rounded-xl border border-slate-200 bg-white px-3.5 py-3 text-sm font-normal outline-none transition focus:border-brand-500 focus:ring-2 focus:ring-brand-100";
-  function selectSubject(subjectId: string) { if (!selectedSubjects.includes(subjectId)) setSelectedSubjects((current) => [...current, subjectId]); setSubjectSearch(""); }
-  function changeStream(value: string) { setDepartmentId(value); const permitted = new Set((refs["stream-subjects"] || []).filter((mapping) => fieldValue(mapping, "streamId") === value).map((mapping) => fieldValue(mapping, "subjectId"))); setSelectedSubjects((current) => current.filter((subjectId) => permitted.has(subjectId))); }
+  useEffect(() => {
+    if (!subjectsOpen) {
+      setSubjectMenuPosition(null);
+      return;
+    }
+    function updatePosition() {
+      const rect = subjectTriggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const expectedHeight = Math.min(280, 72 + filteredSubjects.length * 44);
+      const below = window.innerHeight - rect.bottom - 8;
+      const above = rect.top - 8;
+      const openAbove = below < expectedHeight && above > below;
+      const maxHeight = Math.min(
+        expectedHeight,
+        openAbove ? above : below,
+        window.innerHeight - 16,
+      );
+      setSubjectMenuPosition({
+        top: openAbove ? rect.top - maxHeight - 6 : rect.bottom + 6,
+        left: Math.max(
+          8,
+          Math.min(rect.left, window.innerWidth - rect.width - 8),
+        ),
+        width: rect.width,
+        maxHeight,
+      });
+    }
+    function closeOnOutsidePointer(event: PointerEvent) {
+      const target = event.target as Node;
+      if (
+        !subjectTriggerRef.current?.contains(target) &&
+        !subjectMenuRef.current?.contains(target)
+      ) {
+        setSubjectsOpen(false);
+      }
+    }
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+    };
+  }, [filteredSubjects.length, subjectsOpen]);
+  function selectSubject(subjectId: string) { if (!selectedSubjects.includes(subjectId)) setSelectedSubjects((current) => [...current, subjectId]); setSubjectSearch(""); setSubjectsOpen(false); }
+  function changeStream(value: string) { setDepartmentId(value); setStreamError(""); const permitted = new Set((refs["stream-subjects"] || []).filter((mapping) => fieldValue(mapping, "streamId") === value).map((mapping) => fieldValue(mapping, "subjectId"))); setSelectedSubjects((current) => current.filter((subjectId) => permitted.has(subjectId))); }
+  function handleSubmit(event: FormEvent<HTMLFormElement>) { if (!departmentId) { event.preventDefault(); setStreamError("Select a stream to continue."); return; } setStreamError(""); submit(event); }
   return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-3 backdrop-blur-sm sm:p-6" role="dialog" aria-modal="true" aria-labelledby="teacher-modal-title">
-    <form onSubmit={submit} className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+    <form onSubmit={handleSubmit} className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
       <header className="flex shrink-0 items-start gap-4 border-b border-slate-100 px-5 py-5 sm:px-7"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-brand-50 text-brand-700"><UserPlus size={24}/></span><div className="min-w-0 flex-1"><h2 id="teacher-modal-title" className="text-2xl font-bold tracking-tight text-slate-900">{editing ? "Edit Teacher" : "Add Teacher"}</h2><p className="mt-1 text-sm text-slate-500">Enter teacher details and {editing ? "update their academic profile." : "create a secure account."}</p></div><button type="button" onClick={close} className="rounded-xl p-2 text-slate-500 hover:bg-slate-100" aria-label="Close"><X size={22}/></button></header>
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto bg-slate-50/60 p-4 sm:p-6">
         <TeacherSection icon={UserPlus} title="Personal Information"><TeacherField label="Teacher Full Name" required><input name="name" required defaultValue={editing?.userId?.name || fieldValue(editing,"name")} placeholder="Enter teacher full name" className={fieldClass}/></TeacherField><TeacherField label="Email Address" required><input name="email" type="email" required defaultValue={editing?.userId?.email || fieldValue(editing,"email")} placeholder="Enter email address" className={fieldClass}/></TeacherField><TeacherField label="Employee ID" required><input name="employeeNumber" required defaultValue={fieldValue(editing,"employeeNumber")} placeholder="Enter employee ID" className={fieldClass}/></TeacherField><TeacherField label="Phone Number"><input name="phone" type="tel" defaultValue={fieldValue(editing,"phone")} placeholder="Enter phone number" className={fieldClass}/></TeacherField></TeacherSection>
-        <TeacherSection icon={BookOpen} title="Academic Information"><TeacherField label="Stream" required><select name="departmentId" required value={departmentId} onChange={(event) => changeStream(event.target.value)} className={fieldClass}><option value="">Select stream</option>{(refs.streams || []).map((stream) => <option key={stream._id} value={stream._id}>{stream.name}</option>)}</select></TeacherField><TeacherField label="Highest Qualification"><input name="qualification" defaultValue={fieldValue(editing,"qualification")} placeholder="Enter highest qualification" className={fieldClass}/></TeacherField><div className="sm:col-span-2"><label className="text-sm font-semibold text-slate-800">Teaching Subjects</label><div className="relative"><button type="button" onClick={() => setSubjectsOpen(!subjectsOpen)} className={`${fieldClass} flex min-h-12 items-center justify-between text-left ${!departmentId ? "cursor-not-allowed bg-slate-50 text-slate-400" : ""}`} disabled={!departmentId}><span>{departmentId ? "Search and select subjects" : "Select a stream first"}</span><Search size={17} className="text-slate-400"/></button>{subjectsOpen && <div className="absolute z-20 mt-2 w-full rounded-xl border border-slate-200 bg-white p-2 shadow-xl"><input autoFocus value={subjectSearch} onChange={(event) => setSubjectSearch(event.target.value)} placeholder="Search subjects…" className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"/><div className="mt-2 max-h-44 overflow-y-auto">{filteredSubjects.map((subject) => <button type="button" key={subject._id} onClick={() => selectSubject(subject._id)} className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-brand-50"><span>{subject.name}<small className="ml-2 text-slate-400">{subject.code}</small></span>{selectedSubjects.includes(subject._id) && <Check size={16} className="text-brand-600"/>}</button>)}{!filteredSubjects.length && <p className="p-3 text-center text-sm text-slate-500">No subjects found</p>}</div></div>}</div><div className="mt-3 flex min-h-8 flex-wrap gap-2">{selectedDetails.map((subject) => <span key={subject._id} className="inline-flex items-center gap-2 rounded-lg bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700">{subject.name}<button type="button" onClick={() => setSelectedSubjects((current) => current.filter((id) => id !== subject._id))} aria-label={`Remove ${subject.name}`}><X size={14}/></button></span>)}</div>{selectedSubjects.map((subjectId) => <input key={subjectId} type="hidden" name="teachingSubjectIds" value={subjectId}/>)}</div></TeacherSection>
+        <TeacherSection icon={BookOpen} title="Academic Information">
+          <div>
+            <TeacherField label="Stream" required>
+              <input type="hidden" name="departmentId" value={departmentId} />
+              <SearchableSelect
+                label="Stream"
+                value={departmentId}
+                options={streamOptions}
+                onChange={changeStream}
+                placeholder="Choose stream"
+                searchPlaceholder="Search streams..."
+                icon={<BookOpen size={16} />}
+                className="mt-2"
+              />
+            </TeacherField>
+            {streamError && (
+              <p role="alert" className="mt-2 text-xs text-rose-600">
+                {streamError}
+              </p>
+            )}
+          </div>
+          <TeacherField label="Highest Qualification">
+            <input
+              name="qualification"
+              defaultValue={fieldValue(editing, "qualification")}
+              placeholder="Enter highest qualification"
+              className={fieldClass}
+            />
+          </TeacherField>
+          <div className="sm:col-span-2">
+            <label className="text-sm font-semibold text-slate-800">
+              Teaching Subjects
+            </label>
+            <button
+              ref={subjectTriggerRef}
+              type="button"
+              aria-haspopup="listbox"
+              aria-expanded={subjectsOpen}
+              onClick={() => setSubjectsOpen((current) => !current)}
+              className={`${fieldClass} flex min-h-12 items-center justify-between text-left ${!departmentId ? "cursor-not-allowed bg-slate-50 text-slate-400" : ""}`}
+              disabled={!departmentId}
+            >
+              <span>
+                {departmentId
+                  ? "Search and select subjects"
+                  : "Select a stream first"}
+              </span>
+              <Search size={17} className="text-slate-400" />
+            </button>
+            {subjectsOpen &&
+              subjectMenuPosition &&
+              createPortal(
+                <div
+                  ref={subjectMenuRef}
+                  role="listbox"
+                  aria-label="Teaching subjects"
+                  style={{
+                    position: "fixed",
+                    top: subjectMenuPosition.top,
+                    left: subjectMenuPosition.left,
+                    width: subjectMenuPosition.width,
+                    maxHeight: subjectMenuPosition.maxHeight,
+                  }}
+                  className="z-[100] flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white p-2 shadow-xl"
+                >
+                  <input
+                    autoFocus
+                    aria-label="Search teaching subjects"
+                    value={subjectSearch}
+                    onChange={(event) => setSubjectSearch(event.target.value)}
+                    placeholder="Search subjects..."
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-500"
+                  />
+                  <div className="mt-2 min-h-0 flex-1 overflow-y-auto">
+                    {filteredSubjects.map((subject) => (
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={selectedSubjects.includes(subject._id)}
+                        key={subject._id}
+                        onClick={() => selectSubject(subject._id)}
+                        className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-sm hover:bg-brand-50"
+                      >
+                        <span>
+                          {subject.name}
+                          <small className="ml-2 text-slate-400">
+                            {subject.code}
+                          </small>
+                        </span>
+                        {selectedSubjects.includes(subject._id) && (
+                          <Check size={16} className="text-brand-600" />
+                        )}
+                      </button>
+                    ))}
+                    {!filteredSubjects.length && (
+                      <p className="p-3 text-center text-sm text-slate-500">
+                        No subjects found
+                      </p>
+                    )}
+                  </div>
+                </div>,
+                document.body,
+              )}
+            <div className="mt-3 flex min-h-8 flex-wrap gap-2">
+              {selectedDetails.map((subject) => (
+                <span
+                  key={subject._id}
+                  className="inline-flex items-center gap-2 rounded-lg bg-brand-50 px-3 py-1.5 text-sm font-medium text-brand-700"
+                >
+                  {subject.name}
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setSelectedSubjects((current) =>
+                        current.filter((id) => id !== subject._id),
+                      )
+                    }
+                    aria-label={`Remove ${subject.name}`}
+                  >
+                    <X size={14} />
+                  </button>
+                </span>
+              ))}
+            </div>
+            {selectedSubjects.map((subjectId) => (
+              <input
+                key={subjectId}
+                type="hidden"
+                name="teachingSubjectIds"
+                value={subjectId}
+              />
+            ))}
+          </div>
+        </TeacherSection>
         {!editing && <TeacherSection icon={Settings} title="Account Settings" single><label className="flex items-start gap-3"><input name="createLoginAccount" type="checkbox" defaultChecked className="mt-1 h-5 w-5 rounded border-slate-300 text-brand-600 focus:ring-brand-500"/><span><b className="block text-sm text-slate-900">Create Login Account</b><span className="mt-1 block text-sm text-slate-500">A secure temporary password will be generated and sent via email or SMS.</span><span className="mt-3 flex items-center gap-2 rounded-xl bg-brand-50 p-3 text-sm text-brand-800"><LockKeyhole size={17}/>The teacher must change the password on first login.</span></span></label></TeacherSection>}
         {error && <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700">{error}</p>}
       </div>
@@ -833,8 +1563,8 @@ function getFields(
   r: string,
   refs: Record<string, Item[]>,
   structure: { courseId: string; departmentId: string },
-): Field[] {
-  const common: Field[] = [{ key: "name", label: "Name", required: true }];
+): FormField[] {
+  const common: FormField[] = [{ key: "name", label: "Name", required: true }];
   const validSections = (refs.sections || []).filter(
     (item) =>
       fieldValue(item, "courseId") === structure.courseId &&

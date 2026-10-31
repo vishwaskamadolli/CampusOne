@@ -1,11 +1,27 @@
 "use client";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import { createPortal } from "react-dom";
+import {
+  BookOpen,
   CalendarClock,
+  Check,
+  ChevronDown,
+  Layers3,
+  ListFilter,
   LoaderCircle,
+  Search,
   Save,
   Settings2,
   Trash2,
+  UsersRound,
   X,
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -148,27 +164,19 @@ export function TimetableWorkspace({
       !refs.streams?.length
     )
       return;
+    if (items.length) {
+      loadIntoGrid(items[0]);
+      return;
+    }
+    const defaultSection = refs.sections?.[0];
     const first = {
       academicYearId: refs["academic-years"][0]._id,
-      courseId: refs.classes[0]._id,
-      departmentId: refs.streams[0]._id,
-      sectionId: "",
+      courseId: id(defaultSection?.courseId) || refs.classes[0]._id,
+      departmentId:
+        id(defaultSection?.departmentId) || refs.streams[0]._id,
+      sectionId: defaultSection?._id || "",
     };
-    const section = (refs.sections || []).find(
-      (item) =>
-        id(item.courseId) === first.courseId &&
-        id(item.departmentId) === first.departmentId,
-    );
-    first.sectionId = section?._id || "";
-    const existing = items.find(
-      (item) =>
-        id(item.academicYearId) === first.academicYearId &&
-        id(item.courseId) === first.courseId &&
-        id(item.departmentId) === first.departmentId &&
-        id(item.sectionId) === first.sectionId,
-    );
-    if (existing) loadIntoGrid(existing);
-    else setSelection(first);
+    setSelection(first);
   }, [admin, items, refs, selection.academicYearId, settings]);
 
   const validSections = useMemo(
@@ -197,6 +205,15 @@ export function TimetableWorkspace({
     [refs.subjects, mappedSubjectIds],
   );
   const selectedComplete = Object.values(selection).every(Boolean);
+  const existingTimetableOptions = useMemo(
+    () =>
+      items.map((item) => ({
+        ...item,
+        name: `${label(item.courseId)} · ${label(item.departmentId)} · ${label(item.sectionId)}`,
+        code: `${label(item.academicYearId)} · ${item.status}`,
+      })),
+    [items],
+  );
 
   function selectAcademic(key: keyof Selection, value: string) {
     const next = { ...selection, [key]: value };
@@ -351,21 +368,39 @@ export function TimetableWorkspace({
             weekly grid.
           </p>
         </div>
-        <button
-          onClick={() => {
-            if (settingsOpen) setSettingsOpen(false);
-            else {
-              setSettingsDraft(structuredClone(settings));
-              setSettingsOpen(true);
-            }
-          }}
-          className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
-        >
-          <Settings2 size={17} />
-          {settingsOpen
-            ? "Hide schedule settings"
-            : "College schedule settings"}
-        </button>
+        <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+          {items.length > 0 && (
+            <div className="sm:w-72">
+              <SearchableSelect
+                id="existing-timetable-filter"
+                title="Existing timetables"
+                value={editing?._id || ""}
+                options={existingTimetableOptions}
+                icon={<ListFilter size={17} />}
+                searchPlaceholder="Search existing timetables..."
+                onChange={(value) => {
+                  const timetable = items.find((item) => item._id === value);
+                  if (timetable) loadIntoGrid(timetable);
+                }}
+              />
+            </div>
+          )}
+          <button
+            onClick={() => {
+              if (settingsOpen) setSettingsOpen(false);
+              else {
+                setSettingsDraft(structuredClone(settings));
+                setSettingsOpen(true);
+              }
+            }}
+            className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold"
+          >
+            <Settings2 size={17} />
+            {settingsOpen
+              ? "Hide schedule settings"
+              : "College schedule settings"}
+          </button>
+        </div>
       </div>
       {error && (
         <p className="mb-4 rounded-xl bg-rose-50 p-3 text-sm text-rose-700">
@@ -380,33 +415,58 @@ export function TimetableWorkspace({
           save={saveSettings}
         />
       )}
-      <div className="mb-5 grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-soft sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mb-5 grid gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-soft sm:grid-cols-2 xl:grid-cols-4">
         {(
           [
-            ["academicYearId", "Academic Year", "academic-years"],
-            ["courseId", "Class", "classes"],
-            ["departmentId", "Stream", "streams"],
-            ["sectionId", "Section", "sections"],
-          ] as [keyof Selection, string, string][]
-        ).map(([key, title, resource]) => {
+            {
+              key: "academicYearId",
+              title: "Academic Year",
+              resource: "academic-years",
+              icon: <CalendarClock size={17} />,
+              searchPlaceholder: "Search academic years...",
+            },
+            {
+              key: "courseId",
+              title: "Class",
+              resource: "classes",
+              icon: <BookOpen size={17} />,
+              searchPlaceholder: "Search classes...",
+            },
+            {
+              key: "departmentId",
+              title: "Stream",
+              resource: "streams",
+              icon: <Layers3 size={17} />,
+              searchPlaceholder: "Search streams...",
+            },
+            {
+              key: "sectionId",
+              title: "Section",
+              resource: "sections",
+              icon: <UsersRound size={17} />,
+              searchPlaceholder: "Search sections...",
+            },
+          ] as {
+            key: keyof Selection;
+            title: string;
+            resource: string;
+            icon: ReactNode;
+            searchPlaceholder: string;
+          }[]
+        ).map(({ key, title, resource, icon, searchPlaceholder }) => {
           const options =
             key === "sectionId" ? validSections : refs[resource] || [];
           return (
-            <label key={key} className="text-sm font-semibold">
-              {title}
-              <select
-                value={selection[key]}
-                onChange={(event) => selectAcademic(key, event.target.value)}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-white p-2.5 font-normal"
-              >
-                <option value="">Select {title}</option>
-                {options.map((option) => (
-                  <option key={option._id} value={option._id}>
-                    {label(option)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <SearchableSelect
+              key={key}
+              id={`timetable-${key}`}
+              title={title}
+              value={selection[key]}
+              options={options}
+              icon={icon}
+              searchPlaceholder={searchPlaceholder}
+              onChange={(value) => selectAcademic(key, value)}
+            />
           );
         })}
       </div>
@@ -461,27 +521,441 @@ export function TimetableWorkspace({
           Select all four academic fields to open the weekly timetable.
         </div>
       )}
-      <div className="mt-8">
-        <h3 className="mb-3 font-bold">Existing section timetables</h3>
-        <div className="grid gap-3 md:grid-cols-2">
-          {items.map((item) => (
-            <button
-              key={item._id}
-              onClick={() => loadIntoGrid(item)}
-              className="rounded-xl border border-slate-200 bg-white p-4 text-left"
-            >
-              <b>
-                {label(item.courseId)} · {label(item.departmentId)} ·{" "}
-                {label(item.sectionId)}
-              </b>
-              <p className="mt-1 text-xs text-slate-500">
-                {label(item.academicYearId)} · {item.status}
-              </p>
-            </button>
-          ))}
-        </div>
-      </div>
     </section>
+  );
+}
+
+function SearchableSelect({
+  id,
+  title,
+  value,
+  options,
+  icon,
+  searchPlaceholder,
+  onChange,
+}: {
+  id: string;
+  title: string;
+  value: string;
+  options: Item[];
+  icon: ReactNode;
+  searchPlaceholder: string;
+  onChange: (value: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const [activeIndex, setActiveIndex] = useState(0);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const selected = options.find((option) => option._id === value);
+  const filteredOptions = useMemo(() => {
+    const search = query.trim().toLowerCase();
+    if (!search) return options;
+    return options.filter((option) =>
+      [
+        label(option),
+        option.code,
+        option.courseId?.name,
+        option.departmentId?.name,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(search),
+    );
+  }, [options, query]);
+
+  useEffect(() => {
+    if (open) searchRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    function closeOnOutsidePointer(event: PointerEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
+    }
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    return () =>
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+  }, []);
+
+  function choose(option: Item) {
+    onChange(option._id);
+    setOpen(false);
+    setQuery("");
+    triggerRef.current?.focus();
+  }
+
+  function handleSearchKeyDown(
+    event: React.KeyboardEvent<HTMLInputElement>,
+  ) {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      setActiveIndex((index) =>
+        Math.min(index + 1, filteredOptions.length - 1),
+      );
+    } else if (event.key === "ArrowUp") {
+      event.preventDefault();
+      setActiveIndex((index) => Math.max(index - 1, 0));
+    } else if (event.key === "Enter" && filteredOptions[activeIndex]) {
+      event.preventDefault();
+      choose(filteredOptions[activeIndex]);
+    } else if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      triggerRef.current?.focus();
+    }
+  }
+
+  return (
+    <div ref={rootRef} className="relative min-w-0">
+      <label
+        id={`${id}-label`}
+        className="mb-2 block text-xs font-semibold tracking-wide text-slate-600"
+      >
+        {title}
+      </label>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-labelledby={`${id}-label ${id}-value`}
+        aria-controls={`${id}-listbox`}
+        onClick={() => {
+          setOpen((current) => !current);
+          setQuery("");
+          setActiveIndex(0);
+        }}
+        className={`group flex h-14 w-full items-center gap-3 rounded-xl border bg-white px-3 text-left shadow-sm transition duration-200 focus:outline-none focus:ring-4 ${
+          open
+            ? "border-brand-500 ring-4 ring-brand-100"
+            : "border-slate-200 hover:border-slate-300 hover:shadow"
+        }`}
+      >
+        <span
+          aria-hidden="true"
+          className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg transition ${
+            open
+              ? "bg-brand-100 text-brand-700"
+              : "bg-slate-100 text-slate-500 group-hover:bg-brand-50 group-hover:text-brand-700"
+          }`}
+        >
+          {icon}
+        </span>
+        <span
+          id={`${id}-value`}
+          className={`min-w-0 flex-1 truncate text-sm font-semibold ${
+            selected ? "text-slate-800" : "text-slate-400"
+          }`}
+        >
+          {selected ? label(selected) : `Select ${title}`}
+        </span>
+        <ChevronDown
+          aria-hidden="true"
+          size={17}
+          className={`shrink-0 text-slate-400 transition-transform duration-200 ${
+            open ? "rotate-180 text-brand-600" : ""
+          }`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-2 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_50px_rgba(15,23,42,0.16)] ring-1 ring-slate-900/5">
+          <div className="px-2 pb-2 pt-1">
+            <p className="text-xs font-semibold text-slate-700">
+              Choose {title.toLowerCase()}
+            </p>
+            <p className="mt-0.5 text-[11px] text-slate-400">
+              {options.length} {options.length === 1 ? "option" : "options"}{" "}
+              available
+            </p>
+          </div>
+          <div className="relative mb-2">
+            <Search
+              aria-hidden="true"
+              size={15}
+              className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <input
+              ref={searchRef}
+              type="search"
+              role="combobox"
+              aria-autocomplete="list"
+              aria-expanded="true"
+              aria-controls={`${id}-listbox`}
+              aria-activedescendant={
+                filteredOptions[activeIndex]
+                  ? `${id}-option-${filteredOptions[activeIndex]._id}`
+                  : undefined
+              }
+              value={query}
+              onChange={(event) => {
+                setQuery(event.target.value);
+                setActiveIndex(0);
+              }}
+              onKeyDown={handleSearchKeyDown}
+              placeholder={searchPlaceholder}
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-xs text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-brand-300 focus:bg-white focus:ring-2 focus:ring-brand-100"
+            />
+          </div>
+          <div
+            id={`${id}-listbox`}
+            role="listbox"
+            aria-labelledby={`${id}-label`}
+            className="max-h-60 space-y-1 overflow-y-auto"
+          >
+            {filteredOptions.length ? (
+              filteredOptions.map((option, index) => {
+                const isSelected = option._id === value;
+                const isActive = index === activeIndex;
+                const detail =
+                  option.code ||
+                  [
+                    option.courseId?.name,
+                    option.departmentId?.name,
+                  ]
+                    .filter(Boolean)
+                    .join(" · ");
+                return (
+                  <button
+                    id={`${id}-option-${option._id}`}
+                    key={option._id}
+                    role="option"
+                    aria-selected={isSelected}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onMouseEnter={() => setActiveIndex(index)}
+                    onClick={() => choose(option)}
+                    className={`flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition ${
+                      isSelected
+                        ? "bg-brand-50"
+                        : isActive
+                          ? "bg-slate-50"
+                          : "hover:bg-slate-50"
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-[10px] font-bold ${
+                        isSelected
+                          ? "bg-brand-100 text-brand-700"
+                          : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {label(option).slice(0, 2).toUpperCase()}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-xs font-semibold text-slate-700">
+                        {label(option)}
+                      </span>
+                      {detail && (
+                        <span className="mt-0.5 block truncate text-[10px] text-slate-400">
+                          {detail}
+                        </span>
+                      )}
+                    </span>
+                    {isSelected && (
+                      <Check
+                        aria-hidden="true"
+                        size={16}
+                        className="shrink-0 text-brand-600"
+                      />
+                    )}
+                  </button>
+                );
+              })
+            ) : (
+              <div className="px-3 py-8 text-center">
+                <span className="mx-auto grid h-9 w-9 place-items-center rounded-full bg-slate-100 text-slate-400">
+                  <Search size={16} />
+                </span>
+                <p className="mt-2 text-xs font-semibold text-slate-600">
+                  {options.length ? "No matches found" : `No ${title.toLowerCase()} options`}
+                </p>
+                <p className="mt-1 text-[10px] text-slate-400">
+                  {options.length
+                    ? "Try another search."
+                    : "Options will appear here when available."}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CompactSelect({
+  ariaLabel,
+  value,
+  options,
+  onChange,
+  disabled = false,
+  className = "",
+}: {
+  ariaLabel: string;
+  value: string;
+  options: { value: string; label: string; description?: string }[];
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState<{
+    top: number;
+    left: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const selected = options.find((option) => option.value === value);
+  const menuId = `timetable-option-list-${useId()}`;
+
+  useEffect(() => {
+    if (!open) return;
+
+    function updatePosition() {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const maxHeight = Math.min(280, window.innerHeight - 24);
+      const spaceBelow = window.innerHeight - rect.bottom - 8;
+      const top =
+        spaceBelow < Math.min(180, maxHeight) &&
+        rect.top > spaceBelow
+          ? Math.max(8, rect.top - maxHeight - 6)
+          : rect.bottom + 6;
+      const width = Math.max(rect.width, 180);
+      const left = Math.max(
+        8,
+        Math.min(rect.left, window.innerWidth - width - 8),
+      );
+      setPosition({ top, left, width, maxHeight });
+    }
+
+    function closeOnOutsidePointer(event: PointerEvent) {
+      const target = event.target as Node;
+      if (
+        !triggerRef.current?.contains(target) &&
+        !menuRef.current?.contains(target)
+      ) {
+        setOpen(false);
+      }
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setOpen(false);
+        triggerRef.current?.focus();
+      }
+    }
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [open]);
+
+  function choose(option: { value: string; label: string }) {
+    onChange(option.value);
+    setOpen(false);
+    triggerRef.current?.focus();
+  }
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-label={ariaLabel}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-controls={menuId}
+        disabled={disabled}
+        onClick={() => setOpen((current) => !current)}
+        className={`group flex h-9 w-full items-center gap-2 rounded-lg border px-2.5 text-left text-xs font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-brand-100 ${
+          disabled
+            ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-400 shadow-none"
+            : open
+              ? "border-brand-400 bg-brand-50/60 text-brand-800"
+              : "border-slate-200 bg-white text-slate-700 hover:border-brand-300 hover:bg-brand-50/40"
+        } ${className}`}
+      >
+        <span className="min-w-0 flex-1 truncate">
+          {selected?.label || options[0]?.label || "Choose"}
+        </span>
+        <ChevronDown
+          aria-hidden="true"
+          size={14}
+          className={`shrink-0 text-slate-400 transition-transform ${
+            open ? "rotate-180 text-brand-600" : ""
+          }`}
+        />
+      </button>
+      {open &&
+        position &&
+        createPortal(
+          <div
+            ref={menuRef}
+            id={menuId}
+            role="listbox"
+            aria-label={ariaLabel}
+            style={{
+              position: "fixed",
+              top: position.top,
+              left: position.left,
+              width: position.width,
+              maxHeight: position.maxHeight,
+            }}
+            className="z-[100] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_16px_40px_rgba(15,23,42,0.18)] ring-1 ring-slate-900/5"
+          >
+            {options.map((option) => {
+              const isSelected = option.value === value;
+              return (
+                <button
+                  key={option.value || "empty"}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  onClick={() => choose(option)}
+                  className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition ${
+                    isSelected
+                      ? "bg-brand-50 text-brand-800"
+                      : "text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-xs font-semibold">
+                      {option.label}
+                    </span>
+                    {option.description && (
+                      <span className="mt-0.5 block truncate text-[10px] text-slate-400">
+                        {option.description}
+                      </span>
+                    )}
+                  </span>
+                  {isSelected && (
+                    <Check
+                      aria-hidden="true"
+                      size={14}
+                      className="shrink-0 text-brand-600"
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 
@@ -546,45 +1020,46 @@ function EditableGrid({
                       (subject: any) => id(subject) === subjectId,
                     ),
                 );
+                const subjectOptions = [
+                  { value: "", label: "Free period" },
+                  ...subjects.map((subject) => ({
+                    value: subject._id,
+                    label: label(subject),
+                    description: subject.code || undefined,
+                  })),
+                ];
+                const teacherOptions = [
+                  { value: "", label: "Select teacher" },
+                  ...eligible.map((teacher) => ({
+                    value: teacher._id,
+                    label: label(teacher),
+                    description: teacher.employeeNumber || undefined,
+                  })),
+                ];
                 return (
                   <td key={key} className="border-b border-r p-2 align-top">
-                    <select
-                      aria-label={`${day} ${timing.label} subject`}
+                    <CompactSelect
+                      ariaLabel={`${day} ${timing.label} subject`}
                       value={subjectId}
-                      onChange={(event) =>
+                      options={subjectOptions}
+                      onChange={(value) =>
                         updateCell(day, timing, {
-                          subjectId: event.target.value,
+                          subjectId: value,
                           teacherId: "",
                           subjectOverride: false,
                         })
                       }
-                      className="w-full rounded-lg border border-slate-200 bg-white p-2 text-xs"
-                    >
-                      <option value="">Free period</option>
-                      {subjects.map((subject) => (
-                        <option key={subject._id} value={subject._id}>
-                          {label(subject)}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      aria-label={`${day} ${timing.label} teacher`}
-                      disabled={!subjectId}
+                    />
+                    <CompactSelect
+                      ariaLabel={`${day} ${timing.label} teacher`}
                       value={id(entry?.teacherId)}
-                      onChange={(event) =>
-                        updateCell(day, timing, {
-                          teacherId: event.target.value,
-                        })
+                      options={teacherOptions}
+                      disabled={!subjectId}
+                      onChange={(value) =>
+                        updateCell(day, timing, { teacherId: value })
                       }
-                      className="mt-2 w-full rounded-lg border border-slate-200 bg-white p-2 text-xs disabled:bg-slate-50"
-                    >
-                      <option value="">Select teacher</option>
-                      {eligible.map((teacher) => (
-                        <option key={teacher._id} value={teacher._id}>
-                          {label(teacher)}
-                        </option>
-                      ))}
-                    </select>
+                      className="mt-2"
+                    />
                   </td>
                 );
               })}
